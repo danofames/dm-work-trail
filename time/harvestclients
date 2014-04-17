@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# https://github.com/harvesthq/api/blob/master/Sections/Clients.md
+
+EMAIL="${HVSTEMAIL:-danofames@gmail.com}"
+PASSWORD="${HVSTPASSWORD}"
+
+curl -s -H 'Content-Type: application/json' -H 'Accept: application/json'  \
+    -u $EMAIL:$PASSWORD  \
+    "https://connerweb.harvestapp.com/clients"

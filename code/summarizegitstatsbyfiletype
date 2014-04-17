@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+# pass all files that should be summarized as arguments
+# summarizegitstatsbyfiletype path/to/*.tsv
+import argparse
+from operator import itemgetter
+import sys
+import yaml
+
+TYPE_MAP = {
+    'twig':'html',
+    'handlebar':'html',
+    'kit':'html',
+    'jade':'html',
+    'less':'css',
+    'scss':'css',
+    'styl':'css'
+}
+
+def main():
+
+    parser = argparse.ArgumentParser(description="Summary git summary stats by file type.")
+    parser.add_argument('files', nargs='*')
+
+    args = vars(parser.parse_args())
+
+    file_type_stats = {}
+
+    for fname in args['files']:
+        with open(fname, 'r+') as f:
+            for line in f:
+                line_parts = line.strip().split('\t')
+                if not file_type_stats.has_key(line_parts[4]):
+                    file_type_stats[line_parts[4]] = 0
+                file_ext = line_parts[4] if not TYPE_MAP.has_key(line_parts[4]) else TYPE_MAP[line_parts[4]]
+                file_type_stats[file_ext] = file_type_stats[file_ext] \
+                    + int(line_parts[2]) + int(line_parts[3])
+
+    file_type_stats = [{'fileext': line[0], 'changes':line[1]} \
+        for line in sorted(file_type_stats.items(), key=itemgetter(1), reverse=True)][:8]
+    yaml.dump(file_type_stats, sys.stdout,  default_flow_style=False)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

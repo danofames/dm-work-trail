@@ -1,0 +1,62 @@
+#!/usr/bin/env python
+
+# yeartotals path/to/harvest/projects.json < path/to/harvest/entries_for_time_period.json
+
+import argparse
+from datetime import datetime
+import json
+import sys
+import yaml
+
+def get_project_by_id(projects, project_id):
+    for p in projects:
+        if project_id == p['project']['id']:
+            return p
+    return None
+
+def get_project_name(projects, project_id):
+    p = get_project_by_id(projects, project_id)
+    return p['project']['name'] \
+        if p and 'project' in p and 'name' in p['project'] \
+        else None
+
+def get_project_client(projects, project_id):
+    p = get_project_by_id(projects, project_id)
+    return p['project']['client_id'] \
+        if p and 'project' in p and 'client_id' in p['project'] \
+        else None
+
+def main():
+    projects = []
+    year_totals = {
+        'total_clients':0,
+        'total_projects':0,
+        'total_hours':0,
+        'start_date':None,
+        'end_date':None
+    }
+
+    parser = argparse.ArgumentParser(description="Summary git summary stats by file type.")
+    parser.add_argument('projects')
+    args = vars(parser.parse_args())
+
+    with open(args['projects'], 'r+') as f:
+        projects = json.loads(f.read())
+
+    entries = json.loads(sys.stdin.read())
+    project_ids = map(lambda d: d['day_entry']['project_id'], entries)
+    year_totals['total_projects'] = len(set(project_ids))
+    client_ids = map(lambda p: get_project_client(projects, p), set(project_ids))
+    year_totals['total_clients'] = len(set(client_ids))
+    entry_hours = map(lambda entry: entry['day_entry']['hours'], entries)
+    year_totals['total_hours'] = int(reduce(lambda h1, h2: h1 + h2, entry_hours))
+    entry_days = sorted(set(map(lambda entry: datetime.strptime(entry['day_entry']['spent_at'], '%Y-%m-%d'), entries)))
+    year_totals['start_date'] = entry_days[0].strftime('%Y-%m-%d')
+    year_totals['end_date'] = entry_days[-1].strftime('%Y-%m-%d')
+
+    sys.stdout.write(yaml.dump(year_totals, default_flow_style=False))
+
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main())

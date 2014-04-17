@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+
+import argparse
+import re
+import sys
+
+def main():
+    parser = argparse.ArgumentParser(description="Format results of a git log command.")
+    parser.add_argument('--ignore', '-i', action='append')
+
+    args = parser.parse_args()
+    args = vars(args)
+    
+    ignore_patterns = args['ignore']
+
+    revision = None
+    revision_hash = None
+    revision_date = None
+
+    for line in sys.stdin:
+        empty_line = (line.strip() == '')
+        revision_match = re.search('^[0-9a-z]{7}', line)
+
+        if empty_line or revision_match:
+            revision = revision_hash = revision_date = None
+
+        if revision_match:
+            revision_hash = str(revision_match.group())
+            revision_date = str(line[len(revision_hash)+1:]).rstrip()
+
+        elif not empty_line and revision_hash:
+            line_parts = line.split('\t')
+            if line_parts[0] == '-' or line_parts[1] == '-':
+                continue
+
+            file_name = line_parts[2].rstrip()
+            if ignore_patterns:
+                file_searches = [re.search(ignore_pattern, file_name) for ignore_pattern in ignore_patterns]
+                if len(filter(None, file_searches)) > 0:
+                    continue
+
+            fileext_match = re.search('.*\.(\w+)$', file_name)
+            fileext = fileext_match.group(1) if fileext_match else 'unknown'
+
+            sys.stdout.write("%s\t%s\t%s\t%s\t%s\n" % (
+                revision_hash, revision_date, line_parts[0], line_parts[1], fileext))
+
+        elif not line:
+            break
+
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main())
+
+sys.exit(0)

@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+
+# show percentage of each hour that was billed
+# percentofhourbilled < path/to/harvest/entries_for_time_period.json
+
+import argparse
+import csv
+from datetime import datetime, timedelta
+from dateutil import rrule
+from itertools import groupby
+import json
+import sys
+import yaml
+
+def main():
+
+    parser = argparse.ArgumentParser(description="Summary git summary stats by file type.")
+    parser.add_argument('-f', default='yaml', choices=['yaml', 'csv'], dest='format')
+    args = vars(parser.parse_args())
+
+    entries = json.loads(sys.stdin.read())
+    date_parse_format = '%Y-%m-%dT%H:%M:%SZ'
+    hours_with_billed_time = []
+    for entry in entries:
+        # times in UTC
+        created_at = datetime.strptime(entry['day_entry']['created_at'], date_parse_format) \
+            - timedelta(hours=5)
+        updated_at = datetime.strptime(entry['day_entry']['updated_at'], date_parse_format) \
+            - timedelta(hours=5)
+        hours = entry['day_entry']['hours']
+        update_difference_seconds = (updated_at - created_at).seconds
+        difference_hours, difference_remaining_seconds = divmod(update_difference_seconds, (60 * 60))
+        difference_hours = difference_hours + (float(difference_remaining_seconds) / (60 * 60))
+        if abs(difference_hours) < 0.1:
+            # assume time was entered at the end of billed time
+            start_time = (created_at - timedelta(hours=hours)).replace(minute=0, second=0, microsecond=0)
+            end_time = created_at.replace(minute=0, second=0, microsecond=0)
+        else:
+            # elif abs(difference_hours) / hours < 2:
+            # assume created to updated was the time frame
+            # big span between created and updated
+            start_time = created_at.replace(minute=0, second=0, microsecond=0)
+            end_time = (created_at + timedelta(hours=hours)).replace(minute=0, second=0, microsecond=0)
+
+        hours_with_billed_time.extend(
+            [(dt.replace(hour=0), dt.hour) \
+                for dt in rrule.rrule(rrule.HOURLY, dtstart=start_time, until=end_time)]
+        )
+    hours_with_billed_time = sorted(hours_with_billed_time, key=lambda h: h[1])
+    entry_dates = sorted(
+        map(lambda e: datetime.strptime(e['day_entry']['created_at'], date_parse_format), entries)
+    )
+    
+    total_days = (entry_dates[-1] - entry_dates[0]).days
+
+    percent_hours_billed = []
+    for k, g in groupby(hours_with_billed_time, key=lambda d: d[1]):
+        dates = list(g)
+        percent_hours_billed.append({
+            'hour':k,
+            'percent':(float(len(dates)) / total_days) * 100,
+            'dates':len(dates),
+        })
+
+    if args['format'] == 'csv':
+         csvwriter = csv.DictWriter(sys.stdout, ['hour', 'percent', 'dates'])
+         csvwriter.writeheader()
+         csvwriter.writerows(percent_hours_billed)
+    else:
+        sys.stdout.write(yaml.dump({
+            'start_date':entry_dates[0].strftime('%Y-%m-%d'),
+            'end_date':entry_dates[-1].strftime('%Y-%m-%d'),
+            'percent_hours_billed':percent_hours_billed
+        }, default_flow_style=False))
+
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main())
