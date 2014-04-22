@@ -3,4 +3,4 @@
 
 curl -s -H 'Content-Type: application/json' -H 'Accept: application/json'  \
     -u $HVSTEMAIL:$HVSTPASSWORD  \
-    "https://connerweb.harvestapp.com/projects"
+    "https://$HARVESTDOMAIN.harvestapp.com/projects"
