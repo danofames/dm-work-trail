@@ -18,7 +18,7 @@ def main():
         'hours_by_weekday':[]
     }
 
-    parser = argparse.ArgumentParser(description="Summary git summary stats by file type.")
+    parser = argparse.ArgumentParser(description="Show average billable hours by day of week.")
     parser.add_argument('-f', default='yaml', choices=['yaml', 'csv'], dest='format')
     args = vars(parser.parse_args())
 
