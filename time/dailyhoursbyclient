@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+
+# show daily hours billed, by client, for a time period
+# dailyhoursbyclient -p path/to/harvest/projects.json \
+#   < path/to/harvest/entries_for_time_period.json \
+#   > path/to/location/csv
+
+import argparse
+import csv
+from datetime import datetime
+from itertools import groupby
+import json
+import sys
+import yaml
+
+from lib.harvestdata import get_entries, get_project_client
+from lib.utils import write_in_yaml
+
+client_display_order = []
+
+client_cols = [1323495,1659376,1737637,1803519,2301163,1323494,1435830]
+
+def main():
+    parser = argparse.ArgumentParser(description="Show daily hours billed, by client, for a time period")
+    parser.add_argument('-p', dest='project_data', type=argparse.FileType('r'))
+    args = vars(parser.parse_args())
+
+    if 'project_data' in args:
+        project_data = json.loads(args['project_data'].read())
+
+
+    entries_data = get_entries(sys.stdin.read())
+    hours_by_client_and_day = []
+
+    for k, g in groupby(entries_data['entries'], key=lambda e: e['day_entry']['spent_at']):
+
+        for k2, g2 in groupby(list(g), key=lambda e: get_project_client(project_data, e['day_entry']['project_id'])):
+            day_client_entries = list(g2)
+
+            hours_by_client_and_day.append({
+                'date':str(k),
+                'client_id':k2,
+                'hours':sum([d['day_entry']['hours'] for d in day_client_entries if 'day_entry' in d and 'hours' in d['day_entry']]),
+                'entry_count':len(day_client_entries)
+            })
+
+    entries_data['results'] = hours_by_client_and_day
+    entries_data['clients'] = client_cols
+    del entries_data['entries']
+
+    sys.stdout.write(yaml.dump(entries_data, default_flow_style=False))
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main())
